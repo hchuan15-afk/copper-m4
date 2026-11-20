@@ -251,7 +251,11 @@ function startProgress(agent: "copper" | "refund") {
           await work();
           progress.status = "done";
           if (!progress.reply.trim()) progress.reply = SORRY;
-        } catch {
+        } catch (error) {
+          console.error(
+            "[ask-copper]",
+            error instanceof Error ? error.message : error,
+          );
           progress.status = "error";
           if (!progress.reply.trim()) progress.reply = SORRY;
         }
