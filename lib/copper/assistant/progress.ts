@@ -14,12 +14,19 @@ export type ToolStep = {
   output?: unknown;
 };
 
-export type Step = ThinkingStep | ToolStep;
+/** Copper passed the conversation to the Refund agent (Module 4). */
+export type HandoffStep = { type: "handoff"; to: "refund" };
+
+export type Step = ThinkingStep | ToolStep | HandoffStep;
+
+/** Who wrote the reply: Copper, or the Refund agent it handed off to. */
+export type Agent = "copper" | "refund";
 
 export type Progress = {
   steps: Step[];
   reply: string;
   status: "working" | "done" | "error";
+  agent?: Agent;
 };
 
 /** Every tool call in an answer, in order. */
@@ -40,4 +47,11 @@ export const TOOL_LABELS: Record<string, string> = {
   calculate_cost: "Working out the cost",
   check_availability: "Checking stock",
   search_docs: "Searching the documents",
+  transfer_to_refund_agent: "Handing off to the Refund agent",
+};
+
+/** The Refund agent's tools (Module 4). */
+export const REFUND_TOOL_LABELS: Record<string, string> = {
+  get_orders: "Looking up the orders",
+  request_refund: "Asking the app for a refund",
 };

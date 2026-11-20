@@ -139,3 +139,34 @@ second agent, and a person approving the large ones.
 |---|---|---|
 | Page | `app/support/page.tsx` | The "Refund Console" title and nothing else yet, linked from the header as Support |
 | Chat panel | `components/copper/ask-copper.tsx` | With the `docked` prop it starts open and the page beside it stays clickable. It is the same single agent and tools as on the home page |
+
+## Module 4: Refund agent and Refund Console
+
+**Summary:** Two agents, one human. Copper hands refund requests to a second
+agent, the Refund agent. The app's code compares the order amount with an
+auto-refund limit: at or under it, the refund goes through; over it, the
+Refund agent pauses and a person clicks Approve or Reject in the Refund
+Console, and the Refund agent tells the customer.
+
+| Piece | Where | What it does |
+|---|---|---|
+| The rule | `lib/copper/refunds.ts` | `decideRefund()`: looks the order up by id and compares its amount with the limit. Returns `refunded`, `needs_approval`, or `already_refunded` / `already_waiting` / `already_rejected` / `no_such_order`. `STARTING_ORDERS` (Maya Reyes's five orders) and `DEFAULT_LIMIT_USD` ($100) live here |
+| Hand-off | `lib/copper/assistant/ask.ts` | On the Support page Copper gets `transfer_to_refund_agent`. Copper's stream stops on that call (`hasToolCall`), then the Refund agent answers the same conversation |
+| Refund agent | `lib/copper/assistant/refund-agent.ts` | `REFUND_INSTRUCTIONS` and `refundTools(state)`: `get_orders` and `request_refund` (which runs `decideRefund`). It has no tool to approve anything |
+| Decision message | `announceRefundDecision()` in `ask.ts` | After Approve or Reject, the Refund agent writes one message telling the customer. The click is the decision |
+| Console | `components/copper/refund-console.tsx`, `components/copper/refund-store.tsx` | The limit input, the "Waiting for your approval" list with Approve and Reject, and the orders. `RefundProvider` shares the state with the chat and keeps it in `localStorage` |
+| AI calls | `{ module: 4, feature: "refund-agent" }`, `{ module: 4, feature: "refund-decision" }` | One extra streamed call per hand-off, one per decision |
+
+**Data flow:** customer message → Copper → `transfer_to_refund_agent` →
+Refund agent → `get_orders` → `request_refund` → `decideRefund()` → refunded,
+or waiting → person clicks Approve/Reject → order updated → Refund agent tells
+the customer.
+
+**Decisions and trade-offs:** No database: the browser keeps the orders and
+limit and sends them with each message, so the demo works on Vercel with no
+new service. The limit and the order amounts never come from the model, so
+"a supervisor already approved it" changes nothing.
+
+**Risks and open questions:** Because the browser holds the state, a real
+deployment would move orders, the limit and the Approve/Reject click to a
+server-side database with sign-in for the person approving.
