@@ -13,9 +13,9 @@ export const MODELS = [
     googleId: "gemini-3-flash-preview",
   },
   {
-    id: "google/gemini-3.8-flash",
-    label: "Gemini 3.8 Flash (for keys that can't use 2.5 Flash)",
-    googleId: "gemini-3.8-flash",
+    id: "google/gemini-3.5-flash",
+    label: "Gemini 3.5 Flash (for keys that can't use 2.5 Flash)",
+    googleId: "gemini-3.5-flash",
   },
 ] as const;
 
