@@ -7,6 +7,7 @@ export const PRICING: Record<ModelId, { input: number; output: number }> = {
   "google/gemini-3-flash": { input: 0.5, output: 3 },
   // Estimate: priced like Gemini 3 Flash.
   "google/gemini-3.5-flash": { input: 0.5, output: 3 },
+  "google/gemini-3.1-flash-lite": { input: 0.1, output: 0.4 },
 };
 
 export function costUsd(
