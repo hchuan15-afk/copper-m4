@@ -12,6 +12,11 @@ export const MODELS = [
     label: "Gemini 3 Flash (newer, thinks out loud less often)",
     googleId: "gemini-3-flash-preview",
   },
+  {
+    id: "google/gemini-3.8-flash",
+    label: "Gemini 3.8 Flash (for keys that can't use 2.5 Flash)",
+    googleId: "gemini-3.8-flash",
+  },
 ] as const;
 
 export type ModelId = (typeof MODELS)[number]["id"];
