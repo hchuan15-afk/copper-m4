@@ -20,7 +20,7 @@ import {
   refundTools,
 } from "@/lib/copper/assistant/refund-agent";
 import { copperTools } from "@/lib/copper/assistant/tools";
-import type { RefundState } from "@/lib/copper/refunds";
+import type { RefundDecision, RefundState } from "@/lib/copper/refunds";
 
 export type ChatMessage = { role: "user" | "assistant"; content: string };
 
@@ -143,23 +143,30 @@ export async function announceRefundDecision({
   order,
 }: RefundDecisionRequest): Promise<AskCopperResult> {
   const run = startProgress("refund");
-  run.go(async () => {
-    await run.pump(
-      callStream(
-        { module: 4, feature: "refund-decision" },
-        {
-          messages: [
-            ...messages,
-            {
-              role: "user",
-              content: `(Message from the Refund Console, not the customer: the refund for order #${order.id} was ${decision} by a person.)`,
-            },
-          ],
-          instructions: decisionInstructions(decision, order),
-        },
-      ),
-    );
-  });
+  run.go(
+    async () => {
+      await run.pump(
+        callStream(
+          { module: 4, feature: "refund-decision" },
+          {
+            messages: [
+              ...messages,
+              {
+                role: "user",
+                content: `(Message from the Refund Console, not the customer: the refund for order #${order.id} was ${decision} by a person.)`,
+              },
+            ],
+            instructions: decisionInstructions(decision, order),
+          },
+        ),
+      );
+    },
+    () =>
+      // The person's decision stands even if the model can't be reached.
+      decision === "approved"
+        ? `Good news: a person on the Copper team approved your refund for order #${order.id} (${order.item}). $${order.amountUsd} is on its way back to your original payment method.`
+        : `A person on the Copper team reviewed your refund for order #${order.id} (${order.item}) and did not approve it, so you have not been refunded. If you have questions, contact the Copper Crew in the Copper app (Settings > Help).`,
+  );
   return { progress: run.live };
 }
 
@@ -239,25 +246,46 @@ function startProgress(agent: "copper" | "refund") {
     }
   }
 
+  /** The last refund decision in this answer, in plain words. */
+  function refundFallback(): string | null {
+    const step = progress.steps.findLast(
+      (s): s is ToolStep =>
+        s.type === "tool" && s.name === "request_refund" && s.state === "done",
+    );
+    const out = step?.output as RefundDecision | undefined;
+    if (!out) return null;
+    if (out.result === "refunded")
+      return `Your refund for order #${out.orderId} (${out.item}) went through. $${out.amountUsd} is on its way back to your original payment method.`;
+    if (out.result === "needs_approval")
+      return `Your refund for order #${out.orderId} (${out.item}) needs a person on the Copper team to approve it. You'll hear back right here in this chat.`;
+    return out.message;
+  }
+
   return {
     live,
     progress,
     pump,
     update: () => update(snapshot()),
     /** Runs the answer in the background, so the panel gets the first update now. */
-    go(work: () => Promise<void>) {
+    go(
+      work: () => Promise<void>,
+      fallback: () => string | null = refundFallback,
+    ) {
       void (async () => {
         try {
           await work();
           progress.status = "done";
-          if (!progress.reply.trim()) progress.reply = SORRY;
+          if (!progress.reply.trim()) progress.reply = fallback() ?? SORRY;
         } catch (error) {
           console.error(
             "[ask-copper]",
             error instanceof Error ? error.message : error,
           );
-          progress.status = "error";
-          if (!progress.reply.trim()) progress.reply = SORRY;
+          // When the model fails after the app already decided a refund,
+          // tell the customer what the app decided instead of "sorry".
+          const plain = fallback();
+          progress.status = plain ? "done" : "error";
+          if (!progress.reply.trim()) progress.reply = plain ?? SORRY;
         }
         done(snapshot());
       })();
